@@ -1,3 +1,8 @@
+/*
+ * MIT License
+ * Copyright (c) 2023 Benoit Baudaux
+ */
+
 #define _GNU_SOURCE
 
 #include <unistd.h>
