@@ -176,7 +176,7 @@ void addSearchResult(const char * name, const char * desc, const char * category
 
       item.addEventListener("mousedown", (event) => {
 	  
-	  console.log(event);
+	  //console.log(event);
 
 	  let index = event.target.index || event.target.parentElement.index;
 
@@ -328,7 +328,7 @@ int main(int argc, char * argv[]) {
           opacity: 90%;
           cursor: pointer;
 	  max-height: calc(100% - 200px);
-	  overflow: scroll;
+	  overflow: auto;
         }
 
         li:hover {
@@ -369,7 +369,7 @@ int main(int argc, char * argv[]) {
 
 	  font-size: 15px;
 	  color: grey;
-	}
+b	}
 
         iframe {
 
@@ -432,7 +432,7 @@ int main(int argc, char * argv[]) {
 
       search_input.addEventListener("keydown", (event) => {
 
-	  console.log(event);
+	  //console.log(event);
 
 	  if (event.keyCode == 13) {
 
@@ -442,7 +442,7 @@ int main(int argc, char * argv[]) {
 
       search_input.addEventListener("keyup", (event) => {
 
-	  console.log(event);
+	  //console.log(event);
 
 	  Module.wakeUp(3); // Search input changed
 	  
@@ -452,7 +452,7 @@ int main(int argc, char * argv[]) {
 
       function handleMouseDown (x, y) {
 
-	    console.log("Oxygen: mouse down");
+	//console.log("Oxygen: mouse down");
 
 	    //let term_icon_rect = term_icon.getBoundingClientRect();
 	    let search_div_rect = search_div.getBoundingClientRect();
@@ -508,7 +508,7 @@ int main(int argc, char * argv[]) {
 
       window.addEventListener('message', (event) => {
 
-	  console.log(event.data);
+	  //console.log(event.data);
 
 	  if (event.data.type == 8) { // mouse down
 
@@ -528,8 +528,8 @@ int main(int argc, char * argv[]) {
 
       document.body.addEventListener("mousedown", (event) => {
 
-	  console.log("Oxygen mouse down: click outside window !");
-	  console.log(event);
+	  //console.log("Oxygen mouse down: click outside window !");
+	  //console.log(event);
 
 	  handleMouseDown(event.clientX, event.clientY);
 	      
