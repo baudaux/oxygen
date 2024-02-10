@@ -25,6 +25,8 @@ enum event {
   SEARCH_INPUT_CLICKED,
   SEARCH_INPUT_CHANGED,
   ENTER_KEY_PRESSED,
+  LOGIN_CLICKED,
+  START_CMD,
   SEARCH_RESULT_SELECTED = 100
 };
 
@@ -33,7 +35,7 @@ static cJSON * root = NULL;
 static cJSON * apps = NULL;
 static int nb_apps = 0;
 
-void open_info() {
+/*void open_info() {
 
   return;
 
@@ -62,7 +64,7 @@ void close_info() {
   
       iframe.style.display = "none";
     });
-}
+    }*/
 
 EM_JS(int, wait_event, (), {
     
@@ -79,7 +81,57 @@ int start_app(const char * cmd, const char * arg) {
   
   if (pid == 0) { // Child process
 
-    execl (cmd, cmd, arg, (void*)0);
+    if (!arg) {
+      execl (cmd, cmd, (void*)0);
+    }
+    else {
+
+      char * p;
+
+      if ((p=strchr(arg, ' ')) != NULL) {
+
+	char * argv[128];
+	char * args;
+	int i = 0;
+	int j;
+
+	argv[0] = cmd;
+
+	args = malloc(strlen(arg+1));
+	strcpy(args, arg);
+
+	j = 1;
+	
+	argv[j] = args;
+	
+	i += p-arg;
+	args[i] = 0;
+
+	++j;
+
+	argv[j] = args+i+1;
+
+	while ((p=strchr(arg+i+1, ' ')) != NULL) {
+
+	  i += p-(arg+i+1);
+	  args[i] = 0;
+
+	  ++j;
+
+	  argv[j] = args+i+1;
+	}
+
+	++j;
+	argv[j] = NULL;
+
+	execv (cmd, argv);
+
+	free(args);
+      }
+      else {
+	execl (cmd, cmd, arg, (void*)0);
+      }
+    }
   }
 
   return pid;
@@ -120,6 +172,8 @@ void addSearchResult(const char * name, const char * desc, const char * category
 
       let item = document.createElement("li");
       item.index = list.itemIndex;
+      item.style.paddingLeft = "10px";
+      item.style.marginTop = "3px";
 
       list.itemIndex += 1;
 
@@ -245,6 +299,34 @@ void sigchld_handler(int sig) {
       }, pid);*/
 }
 
+int read_login_file(char * username) {
+
+  FILE * token_file = fopen("/home/.login", "r");
+
+  if (!token_file) {
+    
+    return -1;
+  }
+
+  char str[256];
+
+  int size = fread(str, 1, 256, token_file);
+  fclose(token_file);
+
+  str[size] = 0;
+
+  char * e = strchr(str, '\n');
+
+  if (e) {
+
+    strncpy(username, str+9, e-str-9);
+
+    return 0;
+  }
+
+  return -1;
+}
+
 int main(int argc, char * argv[]) {
 
   signal(SIGCHLD, sigchld_handler);
@@ -284,17 +366,36 @@ int main(int argc, char * argv[]) {
 	  color: white;
         }
 
+        \#user_div {
+
+	  display: flex;
+	  justify-content: center;
+        }
+
+	\#user_span {
+
+	  font-size: 20px;
+	  text-decoration: underline;
+	  margin: 10px;
+	}
+
+	\#user_span:hover {
+
+	  cursor: default;
+	  }
+
         \#search_div {
 
           border: solid 1px white;
           border-radius: 20px;
-          width: 300px;
+          width: 400px;
           height: 35px;
           margin: auto;
           display: flex;
           align-items: center;
           padding-left: 10px;
 	  box-shadow: 3px 3px 3px rgba(100, 100, 100, 0.4);
+	  background-color: slategrey;
         }
 
         input {
@@ -302,15 +403,16 @@ int main(int argc, char * argv[]) {
           background: none;
           border: none;
           outline: none;
-          color: #101010;
+          color: white;
           font-family: sans-serif;
           font-size: 22px;
           margin-left: 10px;
+	  width: 100%;
         }
 
         ::placeholder {
 
-	  color: white;
+	  color: #e0e0e0;
         }
 
         ul {
@@ -318,12 +420,15 @@ int main(int argc, char * argv[]) {
           width: 800px;
           margin-left: auto;
           margin-right: auto;
-          background-color: white;
-          color: #303030;
+	  margin-top: 10vh;
+          background-color: #00000030;
+          color: black;
           font-family: sans-serif;
           font-size: 20px;
           list-style-type: none;
-          padding: 10px;
+          padding: 0px;
+	  padding-top: 10px;
+	  padding-bottom: 10px;
           border-radius: 10px;
           opacity: 90%;
           cursor: pointer;
@@ -346,7 +451,7 @@ int main(int argc, char * argv[]) {
 
 	  font-size: 15px;
 	  font-style: italic;
-	  color: deepskyblue;
+	  color: white;
 	}
 
         li > span:nth-child(4) {
@@ -368,8 +473,8 @@ int main(int argc, char * argv[]) {
         li > a:nth-child(5) {
 
 	  font-size: 15px;
-	  color: grey;
-b	}
+	  color: black;
+	}
 
         iframe {
 
@@ -414,6 +519,24 @@ b	}
 
       document.body.appendChild(header);
 
+      let user_div = document.createElement("div");
+      user_div.id = "user_div";
+      document.body.appendChild(user_div);
+
+      let user_span = document.createElement("span");
+      
+      user_span.innerHTML = "connect";
+      user_span.id = "user_span";
+      user_div.appendChild(user_span);
+
+      user_span.addEventListener("mousedown", (event) => {
+
+	  event.stopPropagation();
+
+	  Module.wakeUp(5); // Login clicked
+	      
+	  }, false);
+
       let search_div = document.createElement("div");
       search_div.id = "search_div";
       
@@ -427,8 +550,8 @@ b	}
       search_div.appendChild(search_icon);
 
       let search_input = document.createElement("input");
-
-      search_input.setAttribute("placeholder", "Find an app");
+      Module.search_input = search_input;
+      search_input.setAttribute("placeholder", "Find in exaequOS Store");
 
       search_input.addEventListener("keydown", (event) => {
 
@@ -440,14 +563,6 @@ b	}
 	  }
 	});
 
-      search_input.addEventListener("keyup", (event) => {
-
-	  //console.log(event);
-
-	  Module.wakeUp(3); // Search input changed
-	  
-	});
-
       search_div.appendChild(search_input);
 
       function handleMouseDown (x, y) {
@@ -456,6 +571,7 @@ b	}
 
 	    //let term_icon_rect = term_icon.getBoundingClientRect();
 	    let search_div_rect = search_div.getBoundingClientRect();
+	    let user_span_rect = user_span.getBoundingClientRect();
 
 	    //console.log(term_icon_rect);
 	    
@@ -485,26 +601,38 @@ b	}
 
 	      return 1;
 	    }
+	    else if ( (x >= user_span_rect.left) && (x <= user_span_rect.right) && (y >= user_span_rect.top) && (y <= user_span_rect.bottom) ) {
+
+
+	      Module.wakeUp(5); // Login clicked
+	      
+	      return 1;
+	    }
 
 	    return 0;
       }
 
-      let logo_div = document.createElement("div");
+      /*let logo_div = document.createElement("div");
       logo_div.style.position = "absolute";
       logo_div.style.display = "flex";
       logo_div.style.width = "100vw";
       logo_div.style.justifyContent = "center";
-      logo_div.style.paddingTop = "5vh";
+      logo_div.style.paddingTop = "10vh";
 
-      document.body.appendChild(logo_div);
+      document.body.appendChild(logo_div);*/
 
       let logo = document.createElement("img");
       logo.src = "/netfs/usr/share/logo.svg";
-      logo.style.width = "40vw";
-      logo.style.height = "40vh";
-      logo.style.margin = "auto";
+      logo.style.width = "20vw";
+      logo.style.height = "20vh";
+      logo.style.position = "absolute";
+      logo.style.bottom = "0";
+      logo.style.right = "0";
+
       
-      logo_div.appendChild(logo);
+      //logo.style.margin = "auto";
+      
+      document.body.appendChild(logo);
 
       window.addEventListener('message', (event) => {
 
@@ -534,7 +662,21 @@ b	}
 	  handleMouseDown(event.clientX, event.clientY);
 	      
 	}, false);
-      
+
+      let bc = new BroadcastChannel('channel.desktop');
+
+      bc.onmessage = (messageEvent) => {
+
+	if ('user' in messageEvent.data) {
+	  user_span.innerHTML = messageEvent.data.user;
+	}
+	else if ('start' in messageEvent.data) {
+
+	  Module.start_cmd = messageEvent.data.start;
+	  Module.path = messageEvent.data.path;
+	  Module.wakeUp(6); // START_CMD
+	}
+      };
       
       if (!Module.iframeShown) {
 
@@ -550,6 +692,19 @@ b	}
 
       
     });
+
+  char username[128];
+
+  if (!read_login_file(username)) {
+
+    EM_ASM({
+
+	let user_span = document.getElementById("user_span");
+	
+	user_span.innerHTML = UTF8ToString($0);
+
+      }, username);
+  }
 
 //open_info();
 
@@ -581,6 +736,8 @@ b	}
 	apps = cJSON_GetObjectItem(root, "apps");
 
 	nb_apps = cJSON_GetArraySize(apps);
+
+	show_all_apps();
       }
   }
 
@@ -601,7 +758,7 @@ b	}
      case SEARCH_INPUT_CHANGED:
        {
 
-	 char input[128];
+	 /*char input[128];
 
 	 EM_ASM({
 
@@ -629,7 +786,7 @@ b	}
 
 	     addSearchResult(cJSON_GetStringValue(app_name), cJSON_GetStringValue(app_desc), cJSON_GetStringValue(app_category), cJSON_GetStringValue(app_source), cJSON_GetStringValue(app_icon), cJSON_GetStringValue(app_path), (app_mode != NULL)?cJSON_GetStringValue(app_mode):NULL);
 	   }
-	 }
+	   }*/
 
 	 break;
 	 
@@ -639,7 +796,7 @@ b	}
       case ENTER_KEY_PRESSED:
        {
 
-	 char path[1024];
+	 /*char path[1024];
          char mode[128];
 
          path[0] = 0;
@@ -669,13 +826,56 @@ b	}
 
 	     start_app(path, NULL);
 	   }
-	 }
+	   }*/
+
+	 char input[128];
+
+	 EM_ASM({
+
+	     stringToUTF8(btoa(Module.search_input.value), $0, 128);
+
+	   }, input);
+	   
+	 start_app("/usr/bin/exastore", input);
 
 	 break;
        }
 
+      case LOGIN_CLICKED:
+
+
+	start_app("/usr/bin/exalogin", NULL);
+	break;
+
+      case START_CMD:
+      {
+	char cmd[256];
+	char path[1024];
+
+	EM_ASM({
+
+	    console.log(Module.start_cmd);
+	    console.log(Module.path);
+
+	    stringToUTF8(Module.start_cmd, $0, 256);
+	    stringToUTF8(Module.path, $1, 1024);
+
+	  }, cmd, path);
+
+	// Set cwd to app directory
+	
+	chdir(path);
+	
+	start_app("/usr/bin/havoc", cmd);
+
+	// Reset cwd to home
+	chdir("/home");
+
+	break;
+      }
+
       default:
-         break;
+        break;
     }
 
     if (ret >= SEARCH_RESULT_SELECTED) {
