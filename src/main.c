@@ -492,14 +492,15 @@ int main(int argc, char * argv[]) {
       styleSheet.innerText = styles;
       document.head.appendChild(styleSheet);
 
-      let randomNumber = 60;
+      /*let randomNumber = 60;
 
       while ( ( (randomNumber > 55) && (randomNumber < 80) ) || ( (randomNumber > 175) && (randomNumber < 180) ) ) {
 
 	  randomNumber = Math.floor(Math.random() * 360);
       }
 
-      document.body.style.backgroundColor = `hsl(${randomNumber}, 100%, 70%)`;
+      document.body.style.backgroundColor = `hsl(${randomNumber}, 100%, 70%)`;*/
+      document.body.style.backgroundColor = "#dffffa";
 
     /*let term_icon = document.createElement("img");
 
@@ -708,7 +709,7 @@ int main(int argc, char * argv[]) {
 
 //open_info();
 
-  start_about();
+  //start_about();
 
   FILE * f = fopen("/usr/share/app_db.json", "r");
 
