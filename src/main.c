@@ -11,60 +11,26 @@
 #include <string.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 #include <emscripten.h>
 
 #include <cJSON.h>
 
-#define NB_CHILDREN_MAX 128
-
 enum event {
 
   TERMINAL_BUTTON_CLICKED = 1,
-  SEARCH_INPUT_CLICKED,
-  SEARCH_INPUT_CHANGED,
-  ENTER_KEY_PRESSED,
-  LOGIN_CLICKED,
-  START_CMD,
-  SEARCH_RESULT_SELECTED = 100
+  SUGGESTION_CLICKED,
+  APP_CLICKED,
+  CONNECT_CLICKED,
+  REGISTER_CLICKED,
 };
 
 static bool infoIFrameShown = false;
 static cJSON * root = NULL;
 static cJSON * apps = NULL;
 static int nb_apps = 0;
-
-/*void open_info() {
-
-  return;
-
-  infoIFrameShown = true;
-
-  EM_ASM({
-      
-      let iframe = document.createElement("iframe");
-
-      iframe.id = "info";
-      iframe.src = "/netfs/usr/local/share/info/index.html";
-  
-      document.body.appendChild(iframe);
-    });
-}
-
-void close_info() {
-
-  return;
-
-  infoIFrameShown = false;
-
-  EM_ASM({
-      
-      let iframe = document.getElementById("info");
-  
-      iframe.style.display = "none";
-    });
-    }*/
 
 EM_JS(int, wait_event, (), {
     
@@ -73,7 +39,24 @@ EM_JS(int, wait_event, (), {
 	Module.wakeUp = wakeUp;
       });
   }
-  );
+);
+
+void sigchld_handler(int sig) {
+  
+  int status;
+  
+  int pid = wait(&status);
+}
+
+void start_terminal() {
+
+  int pid = fork();
+
+  if (pid == 0) {
+
+    execl ("/usr/bin/havoc", "/usr/bin/havoc", (void*)0);
+  }
+}
 
 int start_app(const char * cmd, const char * arg) {
 
@@ -137,168 +120,6 @@ int start_app(const char * cmd, const char * arg) {
   return pid;
 }
 
-void clearSearchResult() {
-
-  EM_ASM({
-
-      let lists = document.getElementsByTagName("ul");
-
-      if (!lists || (lists.length == 0)) {
-
-	let list = document.createElement("ul");
-	document.body.appendChild(list);
-      }
-      else {
-
-	while (lists[0].firstChild) {
-
-	  lists[0].removeChild(lists[0].firstChild);
-	}
-      }
-
-      lists[0].style.visibility = "hidden";
-
-      lists[0].itemIndex = 0;
-    });
-}
-
-void addSearchResult(const char * name, const char * desc, const char * category, const char * source, const char * icon, const char * path, const char * mode) {
-
-  EM_ASM({
-
-      let list = document.getElementsByTagName("ul")[0];
-
-      list.style.visibility = "visible";
-
-      let item = document.createElement("li");
-      item.index = list.itemIndex;
-      item.style.paddingLeft = "10px";
-      item.style.marginTop = "3px";
-
-      list.itemIndex += 1;
-
-      let logo = document.createElement("div");
-
-      logo.style.backgroundImage = "url("+UTF8ToString($4)+")";
-      logo.style.backgroundSize = "contain";
-      logo.style.backgroundRepeat = "no-repeat";
-      logo.style.backgroundPosition = "bottom";
-      logo.style.width = "20px";
-      logo.style.height = "20px";
-      logo.style.display = "inline-block";
-
-      item.appendChild(logo);
-
-      let name = document.createElement("span");
-
-      name.innerText = UTF8ToString($0);
-
-      item.appendChild(name);
-
-      let desc = document.createElement("span");
-
-      desc.innerText = UTF8ToString($1);
-
-      item.appendChild(desc);
-
-      let category = document.createElement("span");
-
-      category.innerText = UTF8ToString($2);
-
-      item.appendChild(category);
-
-      const link = UTF8ToString($3);
-      
-      if (link.length > 0) {
-
-	let source = document.createElement("a");
-
-	source.setAttribute("target", "_blank");
-
-	source.innerText = "Source";
-      
-	source.href = link;
-
-	item.appendChild(source);
-
-	source.addEventListener("mousedown", (event) => {
-	  
-	    event.stopPropagation();
-	  
-	});
-      }
-
-      item.addEventListener("mousedown", (event) => {
-	  
-	  //console.log(event);
-
-	  let index = event.target.index || event.target.parentElement.index;
-
-	  Module.wakeUp(100+index); // SEARCH_RESULT_SELECTED
-	  
-	});
-
-      item.path = UTF8ToString($5);
-
-      if ($4) {
-
-	item.mode = UTF8ToString($6);
-      }
-
-      list.appendChild(item);
-      
-    }, name, desc, category, source, icon, path, mode);
-}
-
-void show_all_apps() {
-
-  clearSearchResult();
-
-  for (int i = 0; i < nb_apps; ++i) {
-
-    cJSON * app = cJSON_GetArrayItem(apps, i);
-
-    cJSON * app_name = cJSON_GetObjectItem(app, "name");
-    cJSON * app_desc = cJSON_GetObjectItem(app, "desc");
-    cJSON * app_category = cJSON_GetObjectItem(app, "category");
-    cJSON * app_source = cJSON_GetObjectItem(app, "source");
-    cJSON * app_icon = cJSON_GetObjectItem(app, "icon");
-    cJSON * app_path = cJSON_GetObjectItem(app, "path");
-    cJSON * app_mode = cJSON_GetObjectItem(app, "mode");
-
-    addSearchResult(cJSON_GetStringValue(app_name), cJSON_GetStringValue(app_desc), cJSON_GetStringValue(app_category), cJSON_GetStringValue(app_source), cJSON_GetStringValue(app_icon), cJSON_GetStringValue(app_path), (app_mode != NULL)?cJSON_GetStringValue(app_mode):NULL);
-  }
-}
-
-void start_about() {
-
-  int pid = fork();
-
-  if (pid == 0) {
-
-    execl ("/usr/bin/about", "/usr/bin/about", (void*)0);
-  }
-}
-
-void sigchld_handler(int sig) {
-  
-  /*EM_ASM({
-
-      console.log("Oxygen: sigchld_handler "+$0);
-      
-      }, sig);*/
-
-  int status;
-  
-  int pid = wait(&status);
-
-  /*EM_ASM({
-
-      console.log("Oxygen: end of process "+$0);
-      
-      }, pid);*/
-}
-
 int read_login_file(char * username) {
 
   FILE * token_file = fopen("/home/.login", "r");
@@ -327,6 +148,44 @@ int read_login_file(char * username) {
   return -1;
 }
 
+void read_login() {
+
+  char username[128];
+
+  if (!read_login_file(username)) {
+
+    EM_ASM({
+
+	console.log("read_login: user="+$0);
+
+	let connect = document.getElementById("connect");
+	
+	connect.innerHTML = UTF8ToString($0);
+
+	let register = document.getElementById("register");
+
+	register.classList.add("hidden");
+
+      }, username);
+  }
+  else {
+
+    EM_ASM({
+
+	console.log("read_login: no user");
+
+	let connect = document.getElementById("connect");
+	
+	connect.innerHTML = "Connect";
+
+	let register = document.getElementById("register");
+
+	register.classList.remove("hidden");
+
+      });
+  }
+}
+
 int main(int argc, char * argv[]) {
 
   signal(SIGCHLD, sigchld_handler);
@@ -337,303 +196,576 @@ int main(int argc, char * argv[]) {
   setenv("LOGNAME", "root", 0);
 
   chdir("/home");
-
-  /*background-image: url("/netfs/usr/share/background.png");
-	  background-size: contain;
-	  background-repeat: no-repeat;
-	  background-position: center;
-
-  let copyright = document.createElement("span");
-      copyright.id = "copyright";
-      copyright.innerHTML = "&copy;Benoit Baudaux";
-      document.body.appendChild(copyright);*/
   
   EM_ASM({
 
-      let styles = `
+      var all_apps = [];
+      var fuse;
+      
+      function get_apps() {
 
-	body {
-	
-          overflow: hidden;
-	  
-        }
+	window.fetch("/show_all.json")
+	    .then((response) => {
+		
+		if (!response.ok) {
 
-        \#copyright {
+		  return { apps: [
 
-	  position:absolute;
-	  top: calc(100% - 20px);
-	  left: calc(100% - 120px);
-	  color: white;
-        }
+		    {
+	    "name": "Vim",
+	    "desc": "Highly customizable text editor",
+	    "author": "",
+	    "path": "\/usr\/bin\/vim",
+	    "category": "Text editor",
+	    "source": "https:\/\/github.com\/vim\/vim",
+	    "icon": "\/netfs\/usr\/local\/share\/vim\/Icon-Vim.svg"
+	},
+	{
+	    "name": "GNU ed",
+	    "desc": "Line text editor for Unix-like OS",
+	    "author": "",
+	    "path": "\/usr\/bin\/ed",
+	    "category": "Text editor",
+	    "source": "https:\/\/github.com\/happy5214\/gnu-ed",
+	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
+	},
+	{
 
-        \#user_div {
+	    "name": "havoc",
+	    "desc": "Simple terminal emulator",
+	    "author": "",
+	    "path": "\/usr\/bin\/havoc",
+	    "mode": "term",
+	    "category": "Terminal",
+	    "source": "https:\/\/github.com\/ii8\/havoc",
+	    "icon": "\/netfs\/usr\/share\/term_icon.png"
+	},
+	{
 
-	  display: flex;
-	  justify-content: center;
-        }
+	    "name": "Lua",
+	    "desc": "Lua interpreter",
+	    "author": "",
+	    "path": "\/usr\/bin\/lua",
+	    "category": "Programming",
+	    "source": "https:\/\/github.com\/lua\/lua",
+	    "icon": "\/netfs\/usr\/local\/share\/lua\/Lua-Logo.svg"
+	},
+	{
 
-	\#user_span {
+	    "name": "ByWater BASIC",
+	    "desc": "BASIC interpreter",
+	    "author": "",
+	    "path": "\/usr\/bin\/bwbasic",
+	    "category": "Programming",
+	    "source": "https:\/\/github.com\/nerun\/bwbasic",
+	    "icon": ""
+	},
+	{
 
-	  font-size: 20px;
-	  text-decoration: underline;
-	  margin: 10px;
+	    "name": "Colossal Cave Adventure",
+	    "desc": "Historic first ''interactive fiction'' game",
+	    "author": "",
+	    "path": "\/usr\/games\/advent",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/advent4",
+	    "icon": ""
+	},
+	{
+
+	    "name": "GNU Chess",
+	    "desc": "Chess-playing program",
+	    "author": "",
+	    "path": "\/usr\/games\/gnuchess",
+	    "category": "Game",
+	    "source": "https:\/\/git.savannah.gnu.org\/git\/chess",
+	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
+	},
+	{
+
+	    "name": "The Chaotic Dungeon",
+	    "desc": "Dungeon game using raylib game engine",
+	    "author": "",
+	    "path": "\/usr\/games\/thechaoticdungeon",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/Spacecpp\/the-chaotic-dungeon",
+	    "icon": "\/netfs\/usr\/local\/share\/thechaoticdungeon\/dungeon.png"
+	},
+	{
+
+	    "name": "Micro Tetris",
+	    "desc": "One of the smallest Tetris implementations in the world !",
+	    "author": "",
+	    "path": "\/usr\/games\/tetris",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/tetris",
+	    "icon": ""
+	},
+	{
+
+	    "name": "Pacman",
+	    "desc": "Original UNIX version of the Pac-Man game",
+	    "author": "",
+	    "path": "\/usr\/games\/pacman",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/pacman",
+	    "icon": "\/netfs\/usr\/local\/share\/pacman\/pacman-logo.png"
+	},
+	{
+
+	    "name": "Micro Snake",
+	    "desc": "Based on Simon Huggins snake game",
+	    "author": "",
+	    "path": "\/usr\/games\/snake",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/snake",
+	    "icon": ""
+	},
+	{
+
+	    "name": "CSol",
+	    "desc": "A small collection of solitaire/patience card games",
+	    "author": "",
+	    "path": "\/usr\/games\/csol",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/nielssp\/csol",
+	    "icon": "\/netfs\/usr\/local\/share\/csol\/card-ace-hearts.png"
+	      },
+		    {
+	    "name": "Vim",
+	    "desc": "Highly customizable text editor",
+	    "author": "",
+	    "path": "\/usr\/bin\/vim",
+	    "category": "Text editor",
+	    "source": "https:\/\/github.com\/vim\/vim",
+	    "icon": "\/netfs\/usr\/local\/share\/vim\/Icon-Vim.svg"
+	},
+	{
+
+	    "name": "havoc",
+	    "desc": "Simple terminal emulator",
+	    "author": "",
+	    "path": "\/usr\/bin\/havoc",
+	    "mode": "term",
+	    "category": "Terminal",
+	    "source": "https:\/\/github.com\/ii8\/havoc",
+	    "icon": "\/netfs\/usr\/share\/term_icon.png"
+	},
+	{
+
+	    "name": "Lua",
+	    "desc": "Lua interpreter",
+	    "author": "",
+	    "path": "\/usr\/bin\/lua",
+	    "category": "Programming",
+	    "source": "https:\/\/github.com\/lua\/lua",
+	    "icon": "\/netfs\/usr\/local\/share\/lua\/Lua-Logo.svg"
+	},
+	{
+
+	    "name": "ByWater BASIC",
+	    "desc": "BASIC interpreter",
+	    "author": "",
+	    "path": "\/usr\/bin\/bwbasic",
+	    "category": "Programming",
+	    "source": "https:\/\/github.com\/nerun\/bwbasic",
+	    "icon": ""
+	},
+	{
+
+	    "name": "Colossal Cave Adventure",
+	    "desc": "Historic first ''interactive fiction'' game",
+	    "author": "",
+	    "path": "\/usr\/games\/advent",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/advent4",
+	    "icon": ""
+	},
+	{
+
+	    "name": "GNU Chess",
+	    "desc": "Chess-playing program",
+	    "author": "",
+	    "path": "\/usr\/games\/gnuchess",
+	    "category": "Game",
+	    "source": "https:\/\/git.savannah.gnu.org\/git\/chess",
+	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
+	},
+	{
+
+	    "name": "The Chaotic Dungeon",
+	    "desc": "Dungeon game using raylib game engine",
+	    "author": "",
+	    "path": "\/usr\/games\/thechaoticdungeon",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/Spacecpp\/the-chaotic-dungeon",
+	    "icon": "\/netfs\/usr\/local\/share\/thechaoticdungeon\/dungeon.png"
+	},
+	{
+
+	    "name": "Micro Tetris",
+	    "desc": "One of the smallest Tetris implementations in the world !",
+	    "author": "",
+	    "path": "\/usr\/games\/tetris",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/tetris",
+	    "icon": ""
+	},
+	{
+
+	    "name": "Pacman",
+	    "desc": "Original UNIX version of the Pac-Man game",
+	    "author": "",
+	    "path": "\/usr\/games\/pacman",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/pacman",
+	    "icon": "\/netfs\/usr\/local\/share\/pacman\/pacman-logo.png"
+	},
+	{
+
+	    "name": "Micro Snake",
+	    "desc": "Based on Simon Huggins snake game",
+	    "author": "",
+	    "path": "\/usr\/games\/snake",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/troglobit\/snake",
+	    "icon": ""
+	},
+	{
+
+	    "name": "CSol",
+	    "desc": "A small collection of solitaire/patience card games",
+	    "author": "",
+	    "path": "\/usr\/games\/csol",
+	    "category": "Game",
+	    "source": "https:\/\/github.com\/nielssp\/csol",
+	    "icon": "\/netfs\/usr\/local\/share\/csol\/card-ace-hearts.png"
 	}
+		    
 
-	\#user_span:hover {
+                  ]};
+		}
 
-	  cursor: default;
-	  }
+		return response.json();
+	      })
+	    .then((response) => {
+		
+		//console.log(response);
 
-        \#search_div {
+		if ('apps' in response) {
 
-          border: solid 1px white;
-          border-radius: 20px;
-          width: 400px;
-          height: 35px;
-          margin: auto;
-          display: flex;
-          align-items: center;
-          padding-left: 10px;
-	  box-shadow: 3px 3px 3px rgba(100, 100, 100, 0.4);
-	  background-color: slategrey;
-        }
+		  all_apps = response.apps;
 
-        input {
+		  var options = {
+		  shouldSort: true,
+		  tokenize: true,
+		  matchAllTokens: true,
+		  includeScore: true,
+		  threshold: 0.3,
+		  location: 0,
+		  distance: 100,
+		  maxPatternLength: 32,
+		  minMatchCharLength: 1,
+		  keys: ['name','category','desc','author','path']
+		  };
 
-          background: none;
-          border: none;
-          outline: none;
-          color: white;
-          font-family: sans-serif;
-          font-size: 22px;
-          margin-left: 10px;
-	  width: 100%;
-        }
-
-        ::placeholder {
-
-	  color: #e0e0e0;
-        }
-
-        ul {
-
-          width: 800px;
-          margin-left: auto;
-          margin-right: auto;
-	  margin-top: 10vh;
-          background-color: #00000030;
-          color: black;
-          font-family: sans-serif;
-          font-size: 20px;
-          list-style-type: none;
-          padding: 0px;
-	  padding-top: 10px;
-	  padding-bottom: 10px;
-          border-radius: 10px;
-          opacity: 90%;
-          cursor: pointer;
-	  max-height: calc(100% - 200px);
-	  overflow: auto;
-        }
-
-        li:hover {
-
-	  background-color: lightgrey;
-          cursor: pointer;
-        }
-
-        li > span {
-
-	  margin: 10px;
-        }
-
-       li > span:nth-child(3) {
-
-	  font-size: 15px;
-	  font-style: italic;
-	  color: white;
-	}
-
-        li > span:nth-child(4) {
-
-	  font-size: 15px;
-	  color: coral;
-	}
-
-        li > span:nth-child(4)::before {
-
-	  content: '(';
-	}
-
-        li > span:nth-child(4)::after {
-
-	content: ')';
-	}
-
-        li > a:nth-child(5) {
-
-	  font-size: 15px;
-	  color: black;
-	}
-
-        iframe {
-
-	  margin: 20px auto auto auto;
-	  display: block;
-	  width: calc(100% - 100px);
-	  height: calc(90% - 150px);
-	  border: none;
-	  border-radius: 10px;
-	  overflow: scroll;
-        }
-      `;
-
-      let styleSheet = document.createElement("style");
-      styleSheet.innerText = styles;
-      document.head.appendChild(styleSheet);
-
-      /*let randomNumber = 60;
-
-      while ( ( (randomNumber > 55) && (randomNumber < 80) ) || ( (randomNumber > 175) && (randomNumber < 180) ) ) {
-
-	  randomNumber = Math.floor(Math.random() * 360);
+		  fuse = new Fuse(all_apps, options);
+		}
+	      });
       }
-
-      document.body.style.backgroundColor = `hsl(${randomNumber}, 100%, 70%)`;*/
-      document.body.style.backgroundColor = "#dffffa";
-
-    /*let term_icon = document.createElement("img");
-
-      term_icon.src = "/netfs/usr/share/term_icon.png";
-      term_icon.style.position = "absolute";
-      term_icon.style.top = "20px";
-      term_icon.style.left = "20px";
-      term_icon.style.width = "50px";
-
-      term_icon.setAttribute("title", "Open new terminal window");
-
-      document.body.appendChild(term_icon);*/
-
-      let header = document.createElement("div");
-
-      header.style.height = (100+window.innerHeight/10)+"px";
-
-      document.body.appendChild(header);
-
-      let user_div = document.createElement("div");
-      user_div.id = "user_div";
-      document.body.appendChild(user_div);
-
-      let user_span = document.createElement("span");
       
-      user_span.innerHTML = "connect";
-      user_span.id = "user_span";
-      user_div.appendChild(user_span);
-
-      user_span.addEventListener("mousedown", (event) => {
-
-	  event.stopPropagation();
-
-	  Module.wakeUp(5); // Login clicked
-	      
-	  }, false);
-
-      let search_div = document.createElement("div");
-      search_div.id = "search_div";
-      
-      document.body.appendChild(search_div);
-
-      let search_icon = document.createElement("img");
-      search_icon.src = "/netfs/usr/share/search_icon.png";
-      search_icon.style.width = "20px";
-      search_icon.style.height = "20px";
-      
-      search_div.appendChild(search_icon);
-
-      let search_input = document.createElement("input");
-      Module.search_input = search_input;
-      search_input.setAttribute("placeholder", "Find in exaequOS Store");
-
-      search_input.addEventListener("keydown", (event) => {
-
-	  //console.log(event);
-
-	  if (event.keyCode == 13) {
-
-	    Module.wakeUp(4); // Enter key pressed
-	  }
-	});
-
-      search_div.appendChild(search_input);
-
       function handleMouseDown (x, y) {
+
+	let minimize = 0;
 
 	//console.log("Oxygen: mouse down");
 
-	    //let term_icon_rect = term_icon.getBoundingClientRect();
-	    let search_div_rect = search_div.getBoundingClientRect();
-	    let user_span_rect = user_span.getBoundingClientRect();
+	let axel = document.getElementById("axel");
+	let axel_rect = axel.getBoundingClientRect();
+	let term = document.getElementById("term");
+	let term_rect = term.getBoundingClientRect();
+	let input_body = document.getElementById("input_body");
+	let input_rect = input_body.getBoundingClientRect();
+	
 
-	    //console.log(term_icon_rect);
-	    
-	    /*if ( (x >= term_icon_rect.left) && (x <= term_icon_rect.right) && (y >= term_icon_rect.top) && (y <= term_icon_rect.bottom) ) {
+	if ( (x >= axel_rect.left) && (x <= axel_rect.right) && (y >= axel_rect.top) && (y <= axel_rect.bottom) ) {
 
-	      //console.log("Oxygen: mouse down on term icon");
+	  minimize = 1;
+	  show_all_apps();
+	}
+	else if ( (x >= term_rect.left) && (x <= term_rect.right) && (y >= term_rect.top) && (y <= term_rect.bottom) ) {
 
-	      Module.wakeUp(1); // Terminal button clicked
+	  minimize = 1;
+	  Module.wakeUp(1); // TERMINAL_BUTTON_CLICKED
+	}
+	else if ( (x >= input_rect.left) && (x <= input_rect.right) && (y >= input_rect.top) && (y <= input_rect.bottom) ) {
 
-	      return 1;
-	      
-	    }
-	    else */if ( (x >= search_div_rect.left) && (x <= search_div_rect.right) && (y >= search_div_rect.top) && (y <= search_div_rect.bottom) ) {
+	  minimize = 1;
 
-	      //console.log("Oxygen: mouse down on term icon");
+	  setTimeout(() => {
 
-	      let m = new Object();
+	      input_body.focus();
+	    }, 1);
+	}
+	
+
+	if (minimize) {
+
+	  let m = new Object();
 		
-	      m.type = 13; // minimise all windows
-	      m.pid = Module.getpid() & 0x0000ffff;
+	  m.type = 13; // minimise all windows
+	  m.pid = Module.getpid() & 0x0000ffff;
 		    
-	      window.parent.postMessage(m);
+	  window.parent.postMessage(m);
+	}
 
-	      search_input.focus();
-	      
-	      Module.wakeUp(2); // Search input clicked
-
-	      return 1;
-	    }
-	    else if ( (x >= user_span_rect.left) && (x <= user_span_rect.right) && (y >= user_span_rect.top) && (y <= user_span_rect.bottom) ) {
-
-
-	      Module.wakeUp(5); // Login clicked
-	      
-	      return 1;
-	    }
-
-	    return 0;
+	return 0;
       }
 
-      /*let logo_div = document.createElement("div");
-      logo_div.style.position = "absolute";
-      logo_div.style.display = "flex";
-      logo_div.style.width = "100vw";
-      logo_div.style.justifyContent = "center";
-      logo_div.style.paddingTop = "10vh";
+      function desktop_foreground() {
 
-      document.body.appendChild(logo_div);*/
+	let m = new Object();
+		
+	m.type = 17; // desktop on top
+	m.pid = Module.getpid() & 0x0000ffff;
+		    
+	window.parent.postMessage(m);
+      }
 
-      let logo = document.createElement("img");
-      logo.src = "/netfs/usr/share/logo.svg";
-      logo.style.width = "20vw";
-      logo.style.height = "20vh";
-      logo.style.position = "absolute";
-      logo.style.bottom = "0";
-      logo.style.right = "0";
+      function show_apps(apps) {
 
+	console.log(apps);
+
+	desktop_foreground();
+	
+	const find_apps_body = document.getElementById("find_apps_body");
+
+	find_apps_body.classList.add("hidden");
+
+	const find_apps_header = document.getElementById("find_apps_header");
+
+	find_apps_header.classList.remove("hidden");
+
+	const header = document.getElementById("header");
+
+	const list_apps = document.getElementById("list_apps");
+
+	list_apps.classList.remove("hidden");
+	list_apps.style.top = header.getBoundingClientRect().bottom + "px";
+	list_apps.style.height = (window.innerHeight-header.getBoundingClientRect().height) + "px";
+
+	while (list_apps.firstChild)
+	  list_apps.removeChild(list_apps.firstChild);
+
+	for (let app of apps) {
+
+	  let item = document.createElement("li");
+
+	  let name = document.createElement("span");
+
+	  name.innerText = ('item' in app)?app.item.name:app.name;
+
+	  item.appendChild(name);
+
+	  let category = document.createElement("span");
+
+	  category.innerText = "("+ (('item' in app)?app.item.category:app.category) +")";
+
+	  item.appendChild(category);
+
+	  item.path = ('item' in app)?app.item.path:app.path;
+
+	  item.onclick = (event) => {
+
+	    event.stopPropagation();
+
+	    if (event.srcElement.tagName == "SPAN")
+	      window.eventSource = event.srcElement.parentElement;
+	    else
+	      window.eventSource = event.srcElement;
+
+	    Module.wakeUp(3); // APP_CLICKED
+	  };
+
+	  list_apps.appendChild(item);
+	}
+
+	if (apps.length == 0) {
+
+	  let item = document.createElement("li");
+
+	  item.innerHTML = "sorry, no result";
+
+	  item.onclick = (event) => {
+
+	    event.stopPropagation();
+	  };
+	  
+	  list_apps.appendChild(item);
+	}
+	
+      }
+
+      function show_suggestions(result) {
+
+	let show_all = document.getElementById("show_all");
+
+	show_all.classList.add("hidden");
+
+	let sugg = document.getElementById("suggestions");
+
+	sugg.classList.remove("hidden");
+	
+	while (sugg.firstChild)
+	  sugg.removeChild(sugg.firstChild);
+
+	for (let i=0; (i < result.length) && (i < 4); i += 1) {
+
+	  let li = document.createElement("li");
+
+	  li.innerHTML = result[i].item.name;
+	  li.path = result[i].item.path;
+
+	  li.onclick = (event) => {
+
+	    event.stopPropagation();
+
+	    window.eventSource = event.srcElement;
+
+	    Module.wakeUp(2); // SUGGESTION_CLICKED
+	  };
+
+	  sugg.appendChild(li);
+	}
+
+	if (result.length > 4) {
+
+	  let li = document.createElement("li");
+
+	  li.innerHTML = "and more ...";
+
+	  li.onclick = (function(res) {
+
+	    return (event) => {
+
+	      event.stopPropagation();
+
+	      let inputBody = document.getElementById("input_body");
+	      let inputHeader = document.getElementById("input_header");
+
+	      inputHeader.value = inputBody.value;
+
+	      setTimeout(() => {
+
+		  inputHeader.focus();
+		}, 1);
+	    
+	      show_apps(res);
+	    };
+	    })(result);
+
+	  sugg.appendChild(li);
+	}
+	else if (result.length == 0) {
+
+	  let li = document.createElement("li");
+
+	  li.innerHTML = "sorry, no result";
+
+	  sugg.appendChild(li);
+	}
+	
+      }
+
+      function hide_suggestions() {
+
+	let show_all = document.getElementById("show_all");
+
+	show_all.classList.remove("hidden");
+
+	let sugg = document.getElementById("suggestions");
+
+	sugg.classList.add("hidden");
+
+	while (sugg.firstChild)
+	  sugg.removeChild(sugg.firstChild);
+      }
+
+      function hide_all_apps() {
+
+	let show_all = document.getElementById("show_all");
+
+	show_all.classList.remove("hidden");
+
+	let sugg = document.getElementById("suggestions");
+
+	sugg.classList.add("hidden");
+
+	const find_apps_body = document.getElementById("find_apps_body");
+
+	find_apps_body.classList.remove("hidden");
+
+	const find_apps_header = document.getElementById("find_apps_header");
+
+	find_apps_header.classList.add("hidden");
+
+	const list_apps = document.getElementById("list_apps");
+
+	list_apps.classList.add("hidden");
+      }
+
+      Module.hide_all_apps = hide_all_apps;
+
+      function show_all_apps() {
+
+	let inputHeader = document.getElementById("input_header");
+
+	inputHeader.value = inputBody.value;
+
+	setTimeout(() => {
+
+	    inputHeader.focus();
+	  }, 1);
+
+	if (inputBody.value.length > 0) {
+
+	  let res = fuse.search(inputBody.value);
+
+	  show_apps(res);
+	}
+	else {
+
+	  show_apps(all_apps);
+	}
+      }
+
+      get_apps();
+
+      let term = document.getElementById("term");
       
-      //logo.style.margin = "auto";
-      
-      document.body.appendChild(logo);
+      term.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+
+	  Module.wakeUp(1); // TERMINAL_BUTTON_CLICKED
+	});
+
+      document.body.addEventListener("click", (event) => {
+
+	  //console.log("Oxygen mouse down: click outside window !");
+	  console.log(event);
+
+	  hide_all_apps();
+
+	  let m = new Object();
+		
+	  m.type = 8; //  search clicked window
+	  m.pid = Module.getpid() & 0x0000ffff;
+	  m.x = event.clientX;
+	  m.y = event.clientY;
+		    
+	  window.parent.postMessage(m);
+	      
+	}, false);
 
       window.addEventListener('message', (event) => {
 
@@ -654,30 +786,6 @@ int main(int argc, char * argv[]) {
 	    }
 	  }
 	});
-
-      document.body.addEventListener("mousedown", (event) => {
-
-	  //console.log("Oxygen mouse down: click outside window !");
-	  //console.log(event);
-
-	  handleMouseDown(event.clientX, event.clientY);
-	      
-	}, false);
-
-      let bc = new BroadcastChannel('channel.desktop');
-
-      bc.onmessage = (messageEvent) => {
-
-	if ('user' in messageEvent.data) {
-	  user_span.innerHTML = messageEvent.data.user;
-	}
-	else if ('start' in messageEvent.data) {
-
-	  Module.start_cmd = messageEvent.data.start;
-	  Module.path = messageEvent.data.path;
-	  Module.wakeUp(6); // START_CMD
-	}
-      };
       
       if (!Module.iframeShown) {
 
@@ -687,231 +795,174 @@ int main(int argc, char * argv[]) {
 	
 	    m.type = 7; // show iframe and hide body
 	    m.pid = Module.getpid() & 0x0000ffff;
-
+	    
 	    window.parent.postMessage(m);
       }
 
+      let inputBody = document.getElementById("input_body");
+
+      inputBody.addEventListener("keyup", (event) => {
+
+	  if (event.key == 'Enter') {
+
+	    let sugg = document.getElementById("suggestions");
+
+	    if (sugg.children && (sugg.children.length == 1)) {
+
+	      window.eventSource = sugg.firstChild;
+
+	      Module.wakeUp(2);
+	    }
+	    else {
+
+	      show_all_apps();
+	    }
+	  }
+	  else if (inputBody.value.length > 0) {
+
+	    let res = fuse.search(inputBody.value);
+
+	    show_suggestions(res);
+	  }
+	  else {
+
+	    hide_suggestions();
+	  }
+	});
+
+      let inputHeader = document.getElementById("input_header");
+
+      inputHeader.addEventListener("keyup", (event) => {
+
+	  if (inputHeader.value.length > 0) {
+
+	    let res = fuse.search(inputHeader.value);
+
+	    show_apps(res);
+	  }
+	  else {
+
+	    show_apps(all_apps);
+	  }
+	  
+	});
+
+      inputHeader.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+	});
+
+      let show_all = document.getElementById("show_all");
       
+      show_all.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+	  
+	  show_apps(all_apps);
+	  
+	});
+
+      let axel = document.getElementById("axel");
+
+      axel.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+
+	  const input_header = document.getElementById("input_header");
+
+	  if (find_apps_header.classList.contains("hidden")) {
+
+	    show_all_apps();
+	  }
+	  else {
+	    
+	    hide_all_apps();
+	  }
+	  
+	});
+
+      let connect = document.getElementById("connect");
+
+      connect.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+
+	  Module.wakeUp(4); // CONNECT_CLICKED
+	});
+
+      let register = document.getElementById("register");
+
+      register.addEventListener("click", (event) => {
+
+	  event.stopPropagation();
+
+	  Module.wakeUp(5); // RESGISTER_CLICKED
+	});
+	  
     });
 
-  char username[128];
+  read_login();
 
-  if (!read_login_file(username)) {
-
-    EM_ASM({
-
-	let user_span = document.getElementById("user_span");
-	
-	user_span.innerHTML = UTF8ToString($0);
-
-      }, username);
-  }
-
-//open_info();
-
-  //start_about();
-
-  FILE * f = fopen("/usr/share/app_db.json", "r");
-
-  if (f) {
-
-      char * str;
-
-      fseek(f, 0, SEEK_END);
-      long size = ftell(f);
-      str = (char *)malloc(size);
-
-      fseek(f, 0, SEEK_SET);
-      fread(str, 1, size, f);
-      
-      fclose(f);
-      
-      //printf("app_db.json: \n%s\n", str);
-
-      root = cJSON_Parse(str);
-
-      if (root) {
-	
-	//printf("%s\n", cJSON_Print(root));
-
-	apps = cJSON_GetObjectItem(root, "apps");
-
-	nb_apps = cJSON_GetArraySize(apps);
-
-	show_all_apps();
-      }
-  }
-
+  
   while (1) {
 
     int ret = wait_event();
 
     switch(ret) {
 
-      /*case TERMINAL_BUTTON_CLICKED:
+      case TERMINAL_BUTTON_CLICKED:
 
-      start_terminal();
+	  start_terminal();
       
-      break;*/
+        break;
 
-     case SEARCH_INPUT_CLICKED:
+      case SUGGESTION_CLICKED:
+      case APP_CLICKED:
+	{
 
-     case SEARCH_INPUT_CHANGED:
-       {
+	  char path[1024];
 
-	 /*char input[128];
+	  EM_ASM({
 
-	 EM_ASM({
+	      stringToUTF8(window.eventSource.path, $0, 1024);
 
-	     let input = document.getElementsByTagName("input")[0];
+	      Module.hide_all_apps();
 
-	     stringToUTF8(input.value, $0, 128);
+	    }, path);
 
-	   }, input);
+	  if (strcmp(path, "/usr/bin/havoc")) {
 
-	 clearSearchResult();
+	    start_app("/usr/bin/havoc", path);
+	  }
+	  else {
 
-	 for (int i = 0; i < nb_apps; ++i) {
-
-	   cJSON * app = cJSON_GetArrayItem(apps, i);
-
-	   cJSON * app_name = cJSON_GetObjectItem(app, "name");
-	   cJSON * app_desc = cJSON_GetObjectItem(app, "desc");
-	   cJSON * app_category = cJSON_GetObjectItem(app, "category");
-	   cJSON * app_source = cJSON_GetObjectItem(app, "source");
-	   cJSON * app_icon = cJSON_GetObjectItem(app, "icon");
-
-	   if ( strcasestr(cJSON_GetStringValue(app_name), input) || strcasestr(cJSON_GetStringValue(app_desc), input) || strcasestr(cJSON_GetStringValue(app_category), input) ) {
-	     cJSON * app_path = cJSON_GetObjectItem(app, "path");
-	     cJSON * app_mode = cJSON_GetObjectItem(app, "mode");
-
-	     addSearchResult(cJSON_GetStringValue(app_name), cJSON_GetStringValue(app_desc), cJSON_GetStringValue(app_category), cJSON_GetStringValue(app_source), cJSON_GetStringValue(app_icon), cJSON_GetStringValue(app_path), (app_mode != NULL)?cJSON_GetStringValue(app_mode):NULL);
-	   }
-	   }*/
-
-	 break;
-	 
-       }
-       
+	    start_app("/usr/bin/havoc", NULL);
+	  }
       
-      case ENTER_KEY_PRESSED:
-       {
+        break;
+	}
 
-	 /*char path[1024];
-         char mode[128];
-
-         path[0] = 0;
-         mode[0] = 0;
-
-         EM_ASM({
-
-	  let list = document.getElementsByTagName("ul")[0].getElementsByTagName("li");
-
-	  if (list.length == 0)
-	    return;
-
-	  stringToUTF8(list[0].path, $0, 1024);
-
-	  if (list[0].mode)
-	    stringToUTF8(list[$0].mode, $1, 128);
-	  
-	 }, path, mode);
-
-	 if (path[0] != 0) {
-
-	   if (strcmp(mode, "term") != 0) {
-
-	     start_app("/usr/bin/havoc", path);
-	   }
-	   else {
-
-	     start_app(path, NULL);
-	   }
-	   }*/
-
-	 char input[128];
-
-	 EM_ASM({
-
-	     stringToUTF8(btoa(Module.search_input.value), $0, 128);
-
-	   }, input);
-	   
-	 start_app("/usr/bin/exastore", input);
-
-	 break;
-       }
-
-      case LOGIN_CLICKED:
-
-
-	start_app("/usr/bin/exalogin", NULL);
-	break;
-
-      case START_CMD:
-      {
-	char cmd[256];
-	char path[1024];
-
-	EM_ASM({
-
-	    console.log(Module.start_cmd);
-	    console.log(Module.path);
-
-	    stringToUTF8(Module.start_cmd, $0, 256);
-	    stringToUTF8(Module.path, $1, 1024);
-
-	  }, cmd, path);
-
-	// Set cwd to app directory
+      case CONNECT_CLICKED:
+	{
 	
-	chdir(path);
+	  pid_t pid = start_app("/usr/bin/exalogin", NULL);
+
+	  int status;
 	
-	start_app("/usr/bin/havoc", cmd);
+	  waitpid(pid, &status, 0);
 
-	// Reset cwd to home
-	chdir("/home");
+	  read_login();
+	
+	  break;
+	}
 
+      case REGISTER_CLICKED:
+	
+	start_app("/usr/bin/exasignup", NULL);
 	break;
-      }
 
       default:
         break;
-    }
-
-    if (ret >= SEARCH_RESULT_SELECTED) {
-
-      char path[1024];
-      char mode[128];
-
-      path[0] = 0;
-      mode[0] = 0;
-
-      EM_ASM({
-
-	  let list = document.getElementsByTagName("ul")[0].getElementsByTagName("li");
-
-	  if ($0 >= list.length)
-	    return;
-
-	  stringToUTF8(list[$0].path, $1, 1024);
-
-	  if (list[$0].mode)
-	    stringToUTF8(list[$0].mode, $2, 128);
-	  
-	}, ret-SEARCH_RESULT_SELECTED, path, mode);
-
-      if (path[0] != 0) {
-
-	if (strcmp(mode, "term") != 0) {
-
-	  start_app("/usr/bin/havoc", path);
-	}
-	else {
-
-	  start_app(path, NULL);
-	}
-      }
     }
   }
 
