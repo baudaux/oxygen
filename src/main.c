@@ -25,12 +25,16 @@ enum event {
   APP_CLICKED,
   CONNECT_CLICKED,
   REGISTER_CLICKED,
+  LOGIN_UPDATED,
+  START_CMD,
 };
 
 static bool infoIFrameShown = false;
 static cJSON * root = NULL;
 static cJSON * apps = NULL;
 static int nb_apps = 0;
+
+static pid_t login_pid = -1;
 
 EM_JS(int, wait_event, (), {
     
@@ -49,6 +53,8 @@ void sigchld_handler(int sig) {
 }
 
 void start_terminal() {
+
+  chdir("/home");
 
   int pid = fork();
 
@@ -186,6 +192,29 @@ void read_login() {
   }
 }
 
+void update_login() {
+
+  EM_ASM({
+
+      let connect = document.getElementById("connect");
+      let register = document.getElementById("register");
+      
+      if (Module.username == "connect") {
+
+	connect.innerHTML = "Connect";
+	
+	register.classList.remove("hidden");
+      }
+      else {
+
+	connect.innerHTML = Module.username;
+
+	register.classList.add("hidden");
+      }
+
+    });
+}
+
 int main(int argc, char * argv[]) {
 
   signal(SIGCHLD, sigchld_handler);
@@ -204,7 +233,7 @@ int main(int argc, char * argv[]) {
       
       function get_apps() {
 
-	window.fetch("/show_all.json")
+	window.fetch("/get_all_apps.php")
 	    .then((response) => {
 		
 		if (!response.ok) {
@@ -212,235 +241,22 @@ int main(int argc, char * argv[]) {
 		  return { apps: [
 
 		    {
-	    "name": "Vim",
-	    "desc": "Highly customizable text editor",
-	    "author": "",
-	    "path": "\/usr\/bin\/vim",
+	    "pkg": "Vim",
+	    "description": "Highly customizable text editor",
+	    "username": "system",
+	    "startcmd": "\/usr\/bin\/vim",
 	    "category": "Text editor",
-	    "source": "https:\/\/github.com\/vim\/vim",
-	    "icon": "\/netfs\/usr\/local\/share\/vim\/Icon-Vim.svg"
+	    
 	},
 	{
-	    "name": "GNU ed",
-	    "desc": "Line text editor for Unix-like OS",
-	    "author": "",
-	    "path": "\/usr\/bin\/ed",
+	    "pkg": "GNU ed",
+	    "description": "Line text editor for Unix-like OS",
+	    "username": "system",
+	    "startcmd": "\/usr\/bin\/ed",
 	    "category": "Text editor",
 	    "source": "https:\/\/github.com\/happy5214\/gnu-ed",
 	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
-	},
-	{
-
-	    "name": "havoc",
-	    "desc": "Simple terminal emulator",
-	    "author": "",
-	    "path": "\/usr\/bin\/havoc",
-	    "mode": "term",
-	    "category": "Terminal",
-	    "source": "https:\/\/github.com\/ii8\/havoc",
-	    "icon": "\/netfs\/usr\/share\/term_icon.png"
-	},
-	{
-
-	    "name": "Lua",
-	    "desc": "Lua interpreter",
-	    "author": "",
-	    "path": "\/usr\/bin\/lua",
-	    "category": "Programming",
-	    "source": "https:\/\/github.com\/lua\/lua",
-	    "icon": "\/netfs\/usr\/local\/share\/lua\/Lua-Logo.svg"
-	},
-	{
-
-	    "name": "ByWater BASIC",
-	    "desc": "BASIC interpreter",
-	    "author": "",
-	    "path": "\/usr\/bin\/bwbasic",
-	    "category": "Programming",
-	    "source": "https:\/\/github.com\/nerun\/bwbasic",
-	    "icon": ""
-	},
-	{
-
-	    "name": "Colossal Cave Adventure",
-	    "desc": "Historic first ''interactive fiction'' game",
-	    "author": "",
-	    "path": "\/usr\/games\/advent",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/advent4",
-	    "icon": ""
-	},
-	{
-
-	    "name": "GNU Chess",
-	    "desc": "Chess-playing program",
-	    "author": "",
-	    "path": "\/usr\/games\/gnuchess",
-	    "category": "Game",
-	    "source": "https:\/\/git.savannah.gnu.org\/git\/chess",
-	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
-	},
-	{
-
-	    "name": "The Chaotic Dungeon",
-	    "desc": "Dungeon game using raylib game engine",
-	    "author": "",
-	    "path": "\/usr\/games\/thechaoticdungeon",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/Spacecpp\/the-chaotic-dungeon",
-	    "icon": "\/netfs\/usr\/local\/share\/thechaoticdungeon\/dungeon.png"
-	},
-	{
-
-	    "name": "Micro Tetris",
-	    "desc": "One of the smallest Tetris implementations in the world !",
-	    "author": "",
-	    "path": "\/usr\/games\/tetris",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/tetris",
-	    "icon": ""
-	},
-	{
-
-	    "name": "Pacman",
-	    "desc": "Original UNIX version of the Pac-Man game",
-	    "author": "",
-	    "path": "\/usr\/games\/pacman",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/pacman",
-	    "icon": "\/netfs\/usr\/local\/share\/pacman\/pacman-logo.png"
-	},
-	{
-
-	    "name": "Micro Snake",
-	    "desc": "Based on Simon Huggins snake game",
-	    "author": "",
-	    "path": "\/usr\/games\/snake",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/snake",
-	    "icon": ""
-	},
-	{
-
-	    "name": "CSol",
-	    "desc": "A small collection of solitaire/patience card games",
-	    "author": "",
-	    "path": "\/usr\/games\/csol",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/nielssp\/csol",
-	    "icon": "\/netfs\/usr\/local\/share\/csol\/card-ace-hearts.png"
-	      },
-		    {
-	    "name": "Vim",
-	    "desc": "Highly customizable text editor",
-	    "author": "",
-	    "path": "\/usr\/bin\/vim",
-	    "category": "Text editor",
-	    "source": "https:\/\/github.com\/vim\/vim",
-	    "icon": "\/netfs\/usr\/local\/share\/vim\/Icon-Vim.svg"
-	},
-	{
-
-	    "name": "havoc",
-	    "desc": "Simple terminal emulator",
-	    "author": "",
-	    "path": "\/usr\/bin\/havoc",
-	    "mode": "term",
-	    "category": "Terminal",
-	    "source": "https:\/\/github.com\/ii8\/havoc",
-	    "icon": "\/netfs\/usr\/share\/term_icon.png"
-	},
-	{
-
-	    "name": "Lua",
-	    "desc": "Lua interpreter",
-	    "author": "",
-	    "path": "\/usr\/bin\/lua",
-	    "category": "Programming",
-	    "source": "https:\/\/github.com\/lua\/lua",
-	    "icon": "\/netfs\/usr\/local\/share\/lua\/Lua-Logo.svg"
-	},
-	{
-
-	    "name": "ByWater BASIC",
-	    "desc": "BASIC interpreter",
-	    "author": "",
-	    "path": "\/usr\/bin\/bwbasic",
-	    "category": "Programming",
-	    "source": "https:\/\/github.com\/nerun\/bwbasic",
-	    "icon": ""
-	},
-	{
-
-	    "name": "Colossal Cave Adventure",
-	    "desc": "Historic first ''interactive fiction'' game",
-	    "author": "",
-	    "path": "\/usr\/games\/advent",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/advent4",
-	    "icon": ""
-	},
-	{
-
-	    "name": "GNU Chess",
-	    "desc": "Chess-playing program",
-	    "author": "",
-	    "path": "\/usr\/games\/gnuchess",
-	    "category": "Game",
-	    "source": "https:\/\/git.savannah.gnu.org\/git\/chess",
-	    "icon": "\/netfs\/usr\/local\/share\/gnuchess\/Official_gnu.svg"
-	},
-	{
-
-	    "name": "The Chaotic Dungeon",
-	    "desc": "Dungeon game using raylib game engine",
-	    "author": "",
-	    "path": "\/usr\/games\/thechaoticdungeon",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/Spacecpp\/the-chaotic-dungeon",
-	    "icon": "\/netfs\/usr\/local\/share\/thechaoticdungeon\/dungeon.png"
-	},
-	{
-
-	    "name": "Micro Tetris",
-	    "desc": "One of the smallest Tetris implementations in the world !",
-	    "author": "",
-	    "path": "\/usr\/games\/tetris",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/tetris",
-	    "icon": ""
-	},
-	{
-
-	    "name": "Pacman",
-	    "desc": "Original UNIX version of the Pac-Man game",
-	    "author": "",
-	    "path": "\/usr\/games\/pacman",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/pacman",
-	    "icon": "\/netfs\/usr\/local\/share\/pacman\/pacman-logo.png"
-	},
-	{
-
-	    "name": "Micro Snake",
-	    "desc": "Based on Simon Huggins snake game",
-	    "author": "",
-	    "path": "\/usr\/games\/snake",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/troglobit\/snake",
-	    "icon": ""
-	},
-	{
-
-	    "name": "CSol",
-	    "desc": "A small collection of solitaire/patience card games",
-	    "author": "",
-	    "path": "\/usr\/games\/csol",
-	    "category": "Game",
-	    "source": "https:\/\/github.com\/nielssp\/csol",
-	    "icon": "\/netfs\/usr\/local\/share\/csol\/card-ace-hearts.png"
-	}
-		    
+	} 
 
                   ]};
 		}
@@ -465,7 +281,7 @@ int main(int argc, char * argv[]) {
 		  distance: 100,
 		  maxPatternLength: 32,
 		  minMatchCharLength: 1,
-		  keys: ['name','category','desc','author','path']
+		  keys: ['pkg', 'category','description', 'username', 'startcmd']
 		  };
 
 		  fuse = new Fuse(all_apps, options);
@@ -562,17 +378,22 @@ int main(int argc, char * argv[]) {
 
 	  let name = document.createElement("span");
 
-	  name.innerText = ('item' in app)?app.item.name:app.name;
+	  name.innerText = ('item' in app)?app.item.pkg:app.pkg;
 
 	  item.appendChild(name);
 
-	  let category = document.createElement("span");
+	  let cat = (('item' in app)?app.item.category:app.category);
 
-	  category.innerText = "("+ (('item' in app)?app.item.category:app.category) +")";
+	  if (cat.length > 0) {
+	    
+	    let category = document.createElement("span");
+	    category.innerText = "("+ cat +")";
+	    item.appendChild(category);
+	  }
 
-	  item.appendChild(category);
-
-	  item.path = ('item' in app)?app.item.path:app.path;
+	  item.path = ('item' in app)?app.item.startcmd:app.startcmd;
+	  item.username = ('item' in app)?app.item.username:app.username;
+	  item.pkg = ('item' in app)?app.item.pkg:app.pkg;
 
 	  item.onclick = (event) => {
 
@@ -622,8 +443,10 @@ int main(int argc, char * argv[]) {
 
 	  let li = document.createElement("li");
 
-	  li.innerHTML = result[i].item.name;
-	  li.path = result[i].item.path;
+	  li.innerHTML = result[i].item.pkg;
+	  li.path = result[i].item.startcmd;
+	  li.username = result[i].item.username;
+	  li.pkg = result[i].item.pkg;
 
 	  li.onclick = (event) => {
 
@@ -898,11 +721,28 @@ int main(int argc, char * argv[]) {
 
 	  Module.wakeUp(5); // RESGISTER_CLICKED
 	});
+
+      let bc = new BroadcastChannel('channel.desktop');
+
+      bc.onmessage = (messageEvent) => {
+
+	if ('user' in messageEvent.data) {
+	  
+	  Module.username = messageEvent.data.user;
+
+	  Module.wakeUp(6); // LOGIN_UPDATED
+	}
+	else if ('start' in messageEvent.data) {
+
+	  Module.start_cmd = messageEvent.data.start;
+	  Module.path = messageEvent.data.path;
+	  Module.wakeUp(7); // START_CMD
+	}
+      };
 	  
     });
 
   read_login();
-
   
   while (1) {
 
@@ -921,22 +761,46 @@ int main(int argc, char * argv[]) {
 	{
 
 	  char path[1024];
+	  char username[128];
+	  char pkg[1024];
 
 	  EM_ASM({
 
 	      stringToUTF8(window.eventSource.path, $0, 1024);
+	      stringToUTF8(window.eventSource.username, $1, 128);
+	      stringToUTF8(window.eventSource.pkg, $2, 1024);
 
 	      Module.hide_all_apps();
 
-	    }, path);
+	    }, path, username, pkg);
 
-	  if (strcmp(path, "/usr/bin/havoc")) {
+	  if (strcmp(path, "/usr/bin/havoc") == 0) {
 
-	    start_app("/usr/bin/havoc", path);
+	    chdir("/home");
+
+	    start_app("/usr/bin/havoc", NULL);
+	  }
+	  else if (strcmp(path, "/usr/bin/exastore") == 0) {
+
+	    chdir("/home");
+
+	    start_app("/usr/bin/exastore", NULL);
 	  }
 	  else {
 
-	    start_app("/usr/bin/havoc", NULL);
+	    if (strcmp(username, "system")) {
+
+	      char dir[1024];
+
+	      sprintf(dir, "/usr/store/%s/%s", username, pkg);
+	      chdir(dir);
+	    }
+	    else {
+
+	      chdir("/home");
+	    }
+	    
+	    start_app("/usr/bin/havoc", path);
 	  }
       
         break;
@@ -945,13 +809,7 @@ int main(int argc, char * argv[]) {
       case CONNECT_CLICKED:
 	{
 	
-	  pid_t pid = start_app("/usr/bin/exalogin", NULL);
-
-	  int status;
-	
-	  waitpid(pid, &status, 0);
-
-	  read_login();
+	  login_pid = start_app("/usr/bin/exalogin", NULL);
 	
 	  break;
 	}
@@ -960,6 +818,35 @@ int main(int argc, char * argv[]) {
 	
 	start_app("/usr/bin/exasignup", NULL);
 	break;
+
+      case LOGIN_UPDATED:
+
+	update_login();
+	break;
+
+      case START_CMD:
+	{
+	  char cmd[256];
+	  char path[1024];
+
+	  EM_ASM({
+
+	      console.log(Module.start_cmd);
+	      console.log(Module.path);
+
+	      stringToUTF8(Module.start_cmd, $0, 256);
+	      stringToUTF8(Module.path, $1, 1024);
+
+	    }, cmd, path);
+
+	  // Set cwd to app directory
+	
+	  chdir(path);
+	
+	  start_app("/usr/bin/havoc", cmd);
+
+	  break;
+	}
 
       default:
         break;
